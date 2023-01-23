@@ -1,0 +1,99 @@
+zabbix_export:
+  version: '6.0'
+  date: '2023-01-23T18:36:02Z'
+  groups:
+    -
+      uuid: a637316b45384aaeb842d388829688a5
+      name: 'АСУ СУО'
+  templates:
+    -
+      uuid: d8df894e63994ae6b389bd367cdc38bd
+      template: 'Disabled actions'
+      name: 'Disabled actions'
+      groups:
+        -
+          name: 'АСУ СУО'
+      items:
+        -
+          uuid: d33290fcbe844d23badfb7a0bdf25511
+          name: 'actions get'
+          type: HTTP_AGENT
+          key: actions.get
+          delay: 30m
+          history: '0'
+          trends: '0'
+          value_type: TEXT
+          preprocessing:
+            -
+              type: JSONPATH
+              parameters:
+                - $.result
+          url: '{$ZABBIX.ROOT.URL}/api_jsonrpc.php'
+          posts: |
+            {
+                "jsonrpc": "2.0",
+                "method": "action.get",
+                "params": {
+                    "output": ["status","name"],        
+                    "filter": {
+                        "eventsource": 0
+                    }
+                },
+                "auth": "{$API.TOKEN}",
+            "id": 1
+               }
+          post_type: JSON
+          headers:
+            -
+              name: Content-type
+              value: 'application/json-rpc; charset=utf-8'
+          request_method: POST
+          tags:
+            -
+              tag: Application
+              value: 'Zabbix raw items'
+      discovery_rules:
+        -
+          uuid: 109a7651b1804a4da997ca2a2b73ee07
+          name: 'actions discovery'
+          type: DEPENDENT
+          key: actions.discovery
+          delay: '0'
+          lifetime: '0'
+          item_prototypes:
+            -
+              uuid: 4d9a090555c84c1db10d80341760af69
+              name: 'Action {#NAME} status'
+              type: DEPENDENT
+              key: 'status[{#ID}]'
+              delay: '0'
+              description: '{#NAME}'
+              preprocessing:
+                -
+                  type: JSONPATH
+                  parameters:
+                    - '$.[?(@.actionid=="{#ID}")].status.first()'
+              master_item:
+                key: actions.get
+              tags:
+                -
+                  tag: Application
+                  value: Action
+              trigger_prototypes:
+                -
+                  uuid: 8fd05347ced94b1e9f302413bc1592f1
+                  expression: 'change(/Disabled actions/status[{#ID}])>0'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/Disabled actions/status[{#ID}])=0'
+                  name: 'Action "{#NAME}"  has been disabled'
+                  priority: INFO
+                  manual_close: 'YES'
+          master_item:
+            key: actions.get
+          lld_macro_paths:
+            -
+              lld_macro: '{#ID}'
+              path: $.actionid
+            -
+              lld_macro: '{#NAME}'
+              path: $.name
