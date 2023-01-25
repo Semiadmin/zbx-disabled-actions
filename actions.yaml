@@ -12,7 +12,7 @@ zabbix_export:
       name: 'Disabled actions'
       groups:
         -
-          name: 'АСУ СУО'
+          name: 'templates'
       items:
         -
           uuid: d33290fcbe844d23badfb7a0bdf25511
