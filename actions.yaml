@@ -4,7 +4,7 @@ zabbix_export:
   groups:
     -
       uuid: a637316b45384aaeb842d388829688a5
-      name: 'АСУ СУО'
+      name: 'templates'
   templates:
     -
       uuid: d8df894e63994ae6b389bd367cdc38bd
