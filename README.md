@@ -1,4 +1,4 @@
-# Disabled-actions
+# zbx-disabled-actions
 I think many have come across this feature of Zabbix:
 "If a certain object (host, template, trigger, etc.) used in an action condition/operation is deleted, the condition/operation is removed and the action is disabled to avoid incorrect execution of the action. The action can be re-enabled by the user."
 https://www.zabbix.com/documentation/current/en/manual/config/notifications/action/conditions#actions-disabled-due-to-deleted-objects
