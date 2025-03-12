@@ -1,0 +1,195 @@
+zabbix_export:
+  version: '6.0'
+  date: '2025-03-12T07:27:40Z'
+  groups:
+    - uuid: 57b7ae836ca64446ba2c296389c009b7
+      name: Templates/Modules
+  templates:
+    - uuid: 95c610469cff417b94a4c2254cb0f55e
+      template: 'Zabbix Actions'
+      name: 'Zabbix Actions'
+      groups:
+        - name: Templates/Modules
+      items:
+        - uuid: 6f4d271e5ede41b0b38ff97b65afbcce
+          name: 'Zabbix: Actions get'
+          type: HTTP_AGENT
+          key: zabbix.actions.get
+          delay: 5m
+          history: '0'
+          trends: '0'
+          value_type: TEXT
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.result
+          url: '{$ZABBIX_ROOT_URL}/api_jsonrpc.php'
+          posts: |
+            {
+                "jsonrpc": "2.0",
+                "method": "action.get",
+                "params": {
+                    "output": ["status","name"],        
+                    "filter": {
+                        "eventsource": 0
+                    }
+                },
+                "auth": "{$API.INTERNAL}",
+            "id": 1
+               }
+          post_type: JSON
+          headers:
+            - name: Content-type
+              value: 'application/json-rpc; charset=utf-8'
+          request_method: POST
+          tags:
+            - tag: Application
+              value: 'Zabbix raw items'
+        - uuid: ce493466a06345838b272bbdab305d90
+          name: 'Zabbix: Alerts get'
+          type: SCRIPT
+          key: zabbix.alerts.get
+          delay: '{$ALERTS.UPDATE}'
+          history: '0'
+          trends: '0'
+          value_type: TEXT
+          params: |
+            const params = JSON.parse(value);
+            var url = params.url,
+                token = params.auth,
+                groups = [],
+                resp,    
+                req = new HttpRequest();
+            req.addHeader('Content-Type: application/json; charset=utf-8');
+            const since = Math.round(new Date().getTime() / 1000) - params.delay - 1;
+            var data = '{"jsonrpc":"2.0","method":"alert.get","params":{"output":["status","actionid"],"time_from":'+since+'},"auth":"' + token + '","id":1}';
+            resp = req.post(url,data);
+            return resp
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.result
+          timeout: 10s
+          parameters:
+            - name: auth
+              value: '{$API.INTERNAL}'
+            - name: delay
+              value: '{$ALERTS.UPDATE}'
+            - name: url
+              value: '{$ZABBIX_ROOT_URL}/api_jsonrpc.php'
+          tags:
+            - tag: Application
+              value: 'Zabbix raw items'
+      discovery_rules:
+        - uuid: 073d25207e0c4eb584e4ee8565d1fd71
+          name: 'Zabbix actions discovery'
+          type: DEPENDENT
+          key: zabbix.actions.discovery
+          delay: '0'
+          lifetime: '0'
+          item_prototypes:
+            - uuid: b2f192a5c5924c83a7513d62c7bbf9cb
+              name: 'Zabbix: Action {#ZABBIX.ACTION.NAME} status'
+              type: DEPENDENT
+              key: 'zabbix.action.status[{#ZABBIX.ACTIONID}]'
+              delay: '0'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.actionid=="{#ZABBIX.ACTIONID}")].status.first()'
+              master_item:
+                key: zabbix.actions.get
+              tags:
+                - tag: Application
+                  value: 'Zabbix Actions'
+              trigger_prototypes:
+                - uuid: d566cfdfefe84033971cdb46c1a0291b
+                  expression: 'change(/Zabbix Actions/zabbix.action.status[{#ZABBIX.ACTIONID}])>0'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/Zabbix Actions/zabbix.action.status[{#ZABBIX.ACTIONID}])=0'
+                  name: 'Zabbix: Action "{#ZABBIX.ACTION.NAME}" has been disabled'
+                  priority: INFO
+                  manual_close: 'YES'
+            - uuid: 6c6070e200df4e969064ca3f3c9d5b06
+              name: 'Zabbix: Action {#ZABBIX.ACTION.NAME} message failed'
+              type: DEPENDENT
+              key: 'zabbix.message.failed[{#ZABBIX.ACTIONID}]'
+              delay: '0'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.actionid=="{#ZABBIX.ACTIONID}" && @.status==2)].length()'
+              master_item:
+                key: zabbix.alerts.get
+              tags:
+                - tag: Application
+                  value: 'Zabbix Alerts'
+              trigger_prototypes:
+                - uuid: 5284aab520fc468198884ff2bdad0774
+                  expression: 'last(/Zabbix Actions/zabbix.message.failed[{#ZABBIX.ACTIONID}])'
+                  name: 'Zabbix: Action "{#ZABBIX.ACTION.NAME}": failed messages'
+                  priority: WARNING
+                  manual_close: 'YES'
+            - uuid: 3b032364c3854975a813ceed554a5a63
+              name: 'Zabbix: Action {#ZABBIX.ACTION.NAME} message in process'
+              type: DEPENDENT
+              key: 'zabbix.message.in.process[{#ZABBIX.ACTIONID}]'
+              delay: '0'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.actionid=="{#ZABBIX.ACTIONID}" && @.status==3)].length()'
+              master_item:
+                key: zabbix.alerts.get
+              tags:
+                - tag: Application
+                  value: 'Zabbix Alerts'
+            - uuid: 99348240000e447ab7ef5a80ed0e0e65
+              name: 'Zabbix: Action {#ZABBIX.ACTION.NAME} message not sent'
+              type: DEPENDENT
+              key: 'zabbix.message.not.sent[{#ZABBIX.ACTIONID}]'
+              delay: '0'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.actionid=="{#ZABBIX.ACTIONID}" && @.status==0)].length()'
+              master_item:
+                key: zabbix.alerts.get
+              tags:
+                - tag: Application
+                  value: 'Zabbix Alerts'
+              trigger_prototypes:
+                - uuid: 278e89ed003f429b89a84f1b4dc44746
+                  expression: 'min(/Zabbix Actions/zabbix.message.not.sent[{#ZABBIX.ACTIONID}],#3)>50'
+                  name: 'Zabbix: Action "{#ZABBIX.ACTION.NAME}": too many send attempts'
+                  priority: AVERAGE
+                  manual_close: 'YES'
+            - uuid: 56a5026fbc444c6c9227f4d3cd244ce4
+              name: 'Zabbix: Action {#ZABBIX.ACTION.NAME} message sent'
+              type: DEPENDENT
+              key: 'zabbix.message.sent[{#ZABBIX.ACTIONID}]'
+              delay: '0'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$.[?(@.actionid=="{#ZABBIX.ACTIONID}" && @.status==1)].length()'
+              master_item:
+                key: zabbix.alerts.get
+              tags:
+                - tag: Application
+                  value: 'Zabbix Alerts'
+          master_item:
+            key: zabbix.actions.get
+          lld_macro_paths:
+            - lld_macro: '{#ZABBIX.ACTION.NAME}'
+              path: $.name
+            - lld_macro: '{#ZABBIX.ACTIONID}'
+              path: $.actionid
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 10m
+      macros:
+        - macro: '{$ALERTS.UPDATE}'
+          value: '600'
+          description: 'alert.get update interval, s'
